@@ -102,21 +102,24 @@ def print_summary(tau, adev, err_lo, err_hi, adn=None, scale=1/429228004229873):
     cis = np.vstack((ci_lo, ci_hi)).T
 
     # Print and plot the results
+    # legend_text = r'$\tau$'+"\t\t"+r'$\sigma$'"\n"
+    # legend_text= "\u03C4[s]\t\u03c3[e-17]\n"
+    legend_text = "\u03C4 [s]"+'{0:13}'.format('')+"\u03c3\n"
+    for (t, dev) in zip(tau, adev*10**17):
     #print("Tau\tmin Dev\t\tDev\t\tMax Dev")
     #for (t, dev, ci) in zip(tau, adev*10**17, cis*10**17):
     #    print("%d\t%f\t%f\t%f" % (int(round(t)), ci[0], dev, ci[1]))
 
     # Stable 32 style legend
-    legend_text = "Tau\tSigma\n"
-    for (t, dev) in zip(tau, adev*10**17): 
-        legend_text += "%d\t%.2f\n" % (int(round(t)), dev)
-
+        # legend_text += "%d\t%.2f\n" % (int(round(t)), dev)
+        legend_text += '{:.2e}'.format(t) + \
+                       '{0:4}'.format(' ')+'{:.2e}'.format(dev*10**(-17))+'\n'
     return legend_text.expandtabs()
 
 
 def fit_adev(tau, adev, err_lo, err_high):
 
-    fit_tau_over = 499
+    fit_tau_over = 1
 
     # If there are at least 2 datapoints to fit at large tau_values, fit them
     if len(tau[np.where(tau > fit_tau_over)]) >= 2:
@@ -156,6 +159,8 @@ def fit_adev(tau, adev, err_lo, err_high):
     else:
 
         return [], [], 0.5, -1
+
+
 
 
 def reject_outliers(x, y, m=5.189, switch_polarity=False):
@@ -245,6 +250,7 @@ class Onselect:
         self.line4 = line4
         self.ax4 = ax4
 
+
         self.intervals = [[0, 0]]
         self.data_sel = None  # selected data
 
@@ -283,19 +289,26 @@ class Onselect:
 
         self.ax1.cla()
         self.ax1.plot(self.fullx, self.fully)  # -- Replot full data because we have called cla()
-        self. ax1.set_xticklabels(convert_labView_timestamp(self.ax1.get_xticks()), rotation=0)
+
+        self.ax1.set_xticks(np.linspace(self.fullx[0], self.fullx[len(self.fullx) - 1], 10))
+
+        self.ax1.set_xticklabels(convert_labView_timestamp(self.ax1.get_xticks()), rotation=0)
         # -- Update selected regions visualization
         for ind_range in self.intervals:
-            self.ax1.axvspan(self.fullx[ind_range[0]], self.fullx[ind_range[1]], alpha=0.3, facecolor='red')
+            self.ax1.axvspan(self.fullx[ind_range[0]], self.fullx[ind_range[1]], alpha=0.3, facecolor='green')
 
         self.line2.set_data(x_sel_clean, y_sel_clean)  # update clean data
         self.line2a.set_data(x_sel_outliers, y_sel_outliers)  # update outliers data
         self.ax2.set_xlim(x_sel[0], x_sel[-1])
         self.ax2.set_ylim(y_sel.min(), y_sel.max())
+
+
+        self.ax2.set_xticks(np.linspace(self.fullx[0], self.fullx[len(self.fullx) - 1], 10))
         self.ax2.set_xticklabels(convert_labView_timestamp(self.ax2.get_xticks()), rotation=0)
 
         self.ax3.cla()
-        sns.distplot(y_sel_clean, kde=True, norm_hist=True, hist_kws={'alpha': 0.75, 'rwidth': 0.9}, color='#f37736',
+
+        sns.histplot(y_sel_clean, kde=True, stat='density', bins=50, line_kws={'alpha': 0.75, 'lw': 2}, color='#f37736',
                      ax=self.ax3)
 
         taus = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
@@ -318,16 +331,18 @@ class Onselect:
                           markeredgewidth=1, c='C3')
 
         self.ax4.plot(x_fit, y_fit, ls='--', c='C4')  # plot fit to adev tail
-        self.ax4.text(0.8, 0.99, adev_legend, horizontalalignment='left', verticalalignment='top', transform=self.ax4.transAxes)  # add legend as textbox
+        self.ax4.text(0.02, 0.55, adev_legend, horizontalalignment='left', verticalalignment='top',
+                      transform=self.ax4.transAxes)  # add legend as textbox
 
-        instability_text = f"Instability: {instability_per_sqrt_tau * 10 ** 16:.2f} e-16 Hz/sqrt(tau)"
-        self.ax4.text(0.075, 0.9, instability_text, horizontalalignment='left', verticalalignment='top', transform=self.ax4.transAxes)
+        instability_text = f"Fitting instability (fixed slope of -0.5):\n {instability_per_sqrt_tau * 10 ** 16:.2f}e-16 Hz/\u221A\u03C4"
+        self.ax4.text(0.05, 0.95, instability_text, horizontalalignment='left', verticalalignment='top',
+                      transform=self.ax4.transAxes)
 
         self.ax4.set_yscale('log')
         self.ax4.set_xscale('log')
 
-        self.ax4.set_xlim(1, 10 ** 5)
-        self.ax4.set_ylim(10 ** (-18), 10 ** (-15))
+        self.ax4.set_xlim(1, 10 ** 4)
+        self.ax4.set_ylim(10 ** (-18), 10 ** (-14))
 
         # self.ax4.set_title('Frequency Stability')
         self.ax4.set_xlabel(r'Averaging Time, $\tau$, Seconds')
@@ -349,11 +364,14 @@ class Onselect:
         # be last tau at which we computed adev to be conservative about 'unknown' noise behaviour at unseen taus, or
         # max tau can be last time in dataset if know white frequency noise behaviour is valid up until there. Also see
         # Benkler, E., Lisdat, C. and Sterr, U., 2015 showing that for white frequency noise ff_shift var = adev**2.
-        ff_shift_std = 10**b/np.sqrt(t2[-1])  # conservative estimate
 
+        # ff_shift_std = 10**b/np.sqrt(t2[-1])  # conservative estimate
+        ff_shift_std = np.std(y_sel_clean) * 1 / 42922800422987
         self.ax3.axvline(x=ff_shift, ls='--', c='Gray')
-        ff_shift_text = f"\nFractional frequency offset:\n{ff_shift*10**19:.2f} +- {ff_shift_std*10**19:.2f} e-19 Hz"
+        ff_shift_text = f"\nFractional frequency offset:\n({ff_shift*10**17:.2f} \u00b1 {ff_shift_std*10**17:.2f}) e-17 Hz"
         self.ax3.text(0.05, 0.999, ff_shift_text, horizontalalignment='left', verticalalignment='top', transform=self.ax3.transAxes)
+
+
 
 
 def launch_gui(data):
@@ -371,7 +389,7 @@ def launch_gui(data):
 
     # Blueprint, setup subplots layout
     fig = plt.figure(figsize=(15, 15))  # window aspect ration. Make sure matches aspect ratio of GridSpec below
-    gs1 = GridSpec(4, 4)  # num_rows, num_columns
+    gs1 = GridSpec(4,4)  # num_rows, num_columns
     gs1.update(wspace=0.5, hspace=0.35)
 
     ax1 = fig.add_subplot(gs1[0, :])    # axes for full data
@@ -381,6 +399,10 @@ def launch_gui(data):
 
     # Plot full data
     ax1.plot(x, y)
+
+    ax1.set_xticks(np.linspace(x[0], x[len(x)-1], 10))
+    # or use the following line
+    # ax1.set_xticks(ax1.get_xticks())
     ax1.set_xticklabels(convert_labView_timestamp(ax1.get_xticks()), rotation=0)
 
 
@@ -389,13 +411,14 @@ def launch_gui(data):
     line2a, = ax2.plot([], [], c='r', linestyle='None', marker="x")  # discarded selected data
 
     # Initialize histogram
-    sns.distplot([], kde=True, norm_hist=True, hist_kws={'alpha': 0.75, 'rwidth': 0.9}, color='#f37736', ax=ax3)
+    sns.histplot([], kde=True, stat='density', line_kws={'alpha': 0.75, 'lw': 2}, color='#f37736', ax=ax3)
 
     # Initialize Allan Plot
-    line4, _, _ = ax4.errorbar(x=[], y=[], yerr=[], ls='--', marker='o', capsize=2, elinewidth=1, markeredgewidth=1, c='C3')
-    ax4.set_yscale('log')
-    ax4.set_xscale('log')
-    #ax4.set_title('Frequency Stability')
+    line4, _, _ = ax4.errorbar(x=[], y=[], yerr=[], ls='--', marker='o', capsize=2, elinewidth=1, markeredgewidth=1,
+                               c='C3')
+    ax4.set_yscale('linear')
+    ax4.set_xscale('linear')
+    # ax4.set_title('Frequency Stability')
     ax4.set_xlabel(r'Averaging Time, $\tau$, Seconds')
     ax4.set_ylabel(r'Overlapping Allan Deviation, $\sigma_y(\tau)$')
     ax4.grid(which='major', ls='--')
@@ -404,10 +427,8 @@ def launch_gui(data):
     # Launch selector widget
     onselect = Onselect(x, y, fig, ax1, ax2, line2, line2a, ax3, line4, ax4)  # Create onselect object which will collect the selected data
 
-    span = SpanSelector(ax1, onselect, 'horizontal', useblit=True, rectprops=dict(alpha=0.3, facecolor='red'))
-
+    span = SpanSelector(ax1, onselect, 'horizontal', useblit=True, props=dict(alpha=0.3, facecolor='red'))
     plt.show()  # wait for user to close plot
-
     return 1
 
 
@@ -415,7 +436,7 @@ if __name__ == '__main__':
 
     # Path to a .txt file containing timestamps as first column, and frequency data as second column
     # Here we assume timestamps are relative to LabView epoch, but can change
-    filename = "path/to/data.txt"
+    filename = "sample data.txt"
 
     # Skip header
     data = np.loadtxt(filename, skiprows=0)
