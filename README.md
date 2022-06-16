@@ -1,5 +1,5 @@
 # Stable32-AllanTools
-This is one modified copy of [the AllanTools repository](https://github.com/amv213/Stable32-AllanTools). I have modified some codes and sample data in this repository to increase the readability.
+This is one modified copy of [the AllanTools repository](https://github.com/amv213/Stable32-AllanTools). I have modified some codes and add the sample data in this repository to increase the readability.
 
 Handy graphical user interface to quickly visualize and clean data before calculating Allan deviations. Perfect in the field of frequency metrology to analyze the stability of a system. This script is a port of the free Stable32 software, and gives the same confidence intervals. 
 
